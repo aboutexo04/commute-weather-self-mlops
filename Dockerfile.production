@@ -1,0 +1,49 @@
+# Production Dockerfile for MLOps System
+FROM python:3.10-slim
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# 비-root 사용자 생성 (보안 강화)
+RUN groupadd -r mlops && useradd -r -g mlops mlops
+
+# 시스템 패키지 업데이트 및 필수 도구 설치
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Python 패키지 설치를 위한 requirements.txt 복사
+COPY requirements.txt .
+
+# pip 업그레이드 및 패키지 설치
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
+
+# 애플리케이션 코드 복사
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+COPY app_mlops.py .
+COPY pyproject.toml .
+
+# 필요한 디렉토리 생성
+RUN mkdir -p /app/config /app/logs /app/data /app/mlflow
+
+# 권한 설정
+RUN chown -R mlops:mlops /app
+
+# 비-root 사용자로 전환
+USER mlops
+
+# 포트 8000 노출
+EXPOSE 8000
+
+# 헬스체크 추가
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Gunicorn을 사용한 프로덕션 서버 실행
+CMD ["gunicorn", "app_mlops:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--timeout", "120", "--keep-alive", "2", "--max-requests", "1000", "--max-requests-jitter", "50"]

@@ -5,6 +5,10 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 import pytz
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
