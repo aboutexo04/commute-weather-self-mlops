@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # MLOps 메인 애플리케이션
+  mlops-app:
+    build: .
+    container_name: commute-weather-mlops
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app/src
+    volumes:
+      - ./.env:/app/.env:ro  # 환경 변수 파일 마운트
+      - ./logs:/app/logs     # 로그 디렉토리
+      - ./mlflow:/app/mlflow # MLflow 저장소
+      - ./data:/app/data     # 데이터 디렉토리
+    depends_on:
+      - redis
+    networks:
+      - mlops-network
+    restart: unless-stopped
+
+  # Redis (캐싱 및 작업 큐용)
+  redis:
+    image: redis:7-alpine
+    container_name: mlops-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - mlops-network
+    restart: unless-stopped
+
+  # MLflow 서버 (별도 실행)
+  mlflow-server:
+    build: .
+    container_name: mlops-mlflow
+    ports:
+      - "5001:5000"
+    environment:
+      - PYTHONPATH=/app/src
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./mlflow:/app/mlflow
+    command: ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000", "--backend-store-uri", "file:///app/mlflow"]
+    networks:
+      - mlops-network
+    restart: unless-stopped
+
+  # 데이터 수집기 (스케줄된 작업)
+  data-collector:
+    build: .
+    container_name: mlops-collector
+    environment:
+      - PYTHONPATH=/app/src
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+    command: ["python", "scripts/run_realtime_mlops.py"]
+    depends_on:
+      - redis
+      - mlops-app
+    networks:
+      - mlops-network
+    restart: unless-stopped
+
+networks:
+  mlops-network:
+    driver: bridge
+
+volumes:
+  redis-data:

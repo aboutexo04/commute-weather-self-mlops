@@ -1,0 +1,90 @@
+# Git 관련
+.git
+.gitignore
+
+# 환경 변수 (컨테이너에서 마운트)
+.env
+
+# Python 캐시
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# 가상환경
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE 파일
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS 파일
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 로그 파일 (컨테이너에서 마운트)
+logs/
+*.log
+
+# 데이터 파일 (컨테이너에서 마운트)
+data/
+mlflow/
+
+# 빌드 파일
+build/
+dist/
+*.egg-info/
+
+# 임시 파일
+tmp/
+temp/
+*.tmp
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# 도커 관련
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# 문서
+docs/
+*.md
+README*
+
+# 테스트 파일
+tests/
+test_*
+
+# 기타
+.pytest_cache/
+.coverage

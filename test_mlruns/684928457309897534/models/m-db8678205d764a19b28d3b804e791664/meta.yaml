@@ -1,0 +1,10 @@
+artifact_location: file:///Users/seoyeonmun/commute-weather-self-mlops/test_mlruns/684928457309897534/models/m-db8678205d764a19b28d3b804e791664/artifacts
+creation_timestamp: 1759069779491
+experiment_id: '684928457309897534'
+last_updated_timestamp: 1759069780646
+model_id: m-db8678205d764a19b28d3b804e791664
+model_type: null
+name: model
+source_run_id: 87f589a147b7460383cd534c9857b22c
+status: 2
+status_message: null

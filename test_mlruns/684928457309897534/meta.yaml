@@ -1,0 +1,6 @@
+artifact_location: file:///Users/seoyeonmun/commute-weather-self-mlops/test_mlruns/684928457309897534
+creation_time: 1759069758464
+experiment_id: '684928457309897534'
+last_update_time: 1759069758464
+lifecycle_stage: active
+name: cold-start-test

@@ -1,0 +1,262 @@
+"""피처 엔지니어링 베이스 모듈."""
+
+from __future__ import annotations
+
+import logging
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
+import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class FeatureMetadata:
+    """피처 메타데이터"""
+    name: str
+    description: str
+    feature_type: str  # numerical, categorical, temporal, derived
+    source_columns: List[str]
+    creation_logic: str
+    version: str
+    created_at: datetime
+    data_type: str  # float, int, str, bool
+    expected_range: Optional[Tuple[float, float]] = None
+    nullable: bool = True
+    importance_score: Optional[float] = None
+
+
+@dataclass
+class FeatureSet:
+    """피처 셋 정의"""
+    name: str
+    version: str
+    features: List[FeatureMetadata]
+    target_column: Optional[str] = None
+    description: str = ""
+    created_at: Optional[datetime] = None
+
+    def __post_init__(self):
+        if self.created_at is None:
+            self.created_at = datetime.now()
+
+
+class BaseFeatureTransformer(ABC):
+    """피처 변환기 베이스 클래스"""
+
+    def __init__(self, name: str, version: str = "1.0.0"):
+        self.name = name
+        self.version = version
+        self.feature_metadata: List[FeatureMetadata] = []
+
+    @abstractmethod
+    def transform(self, df: pd.DataFrame) -> pd.DataFrame:
+        """데이터프레임을 변환하여 새로운 피처 생성"""
+        pass
+
+    @abstractmethod
+    def get_feature_names(self) -> List[str]:
+        """생성되는 피처 이름 목록 반환"""
+        pass
+
+    def get_feature_metadata(self) -> List[FeatureMetadata]:
+        """피처 메타데이터 반환"""
+        return self.feature_metadata
+
+    def validate_input(self, df: pd.DataFrame) -> None:
+        """입력 데이터 검증"""
+        if df.empty:
+            raise ValueError("Input DataFrame is empty")
+
+    def validate_output(self, df: pd.DataFrame) -> None:
+        """출력 데이터 검증"""
+        expected_features = self.get_feature_names()
+        missing_features = [f for f in expected_features if f not in df.columns]
+
+        if missing_features:
+            raise ValueError(f"Missing expected features: {missing_features}")
+
+        # NaN 값 체크
+        for feature in expected_features:
+            if df[feature].isna().all():
+                logger.warning(f"Feature '{feature}' contains only NaN values")
+
+
+class FeaturePipeline:
+    """피처 파이프라인 - 여러 변환기를 순차적으로 실행"""
+
+    def __init__(self, name: str, version: str = "1.0.0"):
+        self.name = name
+        self.version = version
+        self.transformers: List[BaseFeatureTransformer] = []
+
+    def add_transformer(self, transformer: BaseFeatureTransformer) -> None:
+        """변환기 추가"""
+        self.transformers.append(transformer)
+        logger.info(f"Added transformer: {transformer.name}")
+
+    def transform(self, df: pd.DataFrame) -> pd.DataFrame:
+        """파이프라인 실행"""
+        logger.info(f"Starting feature pipeline: {self.name}")
+
+        result_df = df.copy()
+        transformation_log = []
+
+        for i, transformer in enumerate(self.transformers):
+            try:
+                logger.info(f"Applying transformer {i+1}/{len(self.transformers)}: {transformer.name}")
+
+                # 변환 전 컬럼 수
+                cols_before = len(result_df.columns)
+
+                # 변환 실행
+                transformer.validate_input(result_df)
+                result_df = transformer.transform(result_df)
+                transformer.validate_output(result_df)
+
+                # 변환 후 컬럼 수
+                cols_after = len(result_df.columns)
+                new_features = transformer.get_feature_names()
+
+                transformation_log.append({
+                    "transformer": transformer.name,
+                    "columns_before": cols_before,
+                    "columns_after": cols_after,
+                    "new_features": new_features,
+                    "new_feature_count": len(new_features)
+                })
+
+                logger.info(f"Transformer {transformer.name} added {len(new_features)} features")
+
+            except Exception as e:
+                logger.error(f"Error in transformer {transformer.name}: {e}")
+                raise
+
+        logger.info(f"Feature pipeline completed: {len(transformation_log)} transformers applied")
+        return result_df
+
+    def get_all_feature_metadata(self) -> List[FeatureMetadata]:
+        """모든 변환기의 피처 메타데이터 수집"""
+        all_metadata = []
+        for transformer in self.transformers:
+            all_metadata.extend(transformer.get_feature_metadata())
+        return all_metadata
+
+    def get_feature_set(self, target_column: Optional[str] = None) -> FeatureSet:
+        """피처 셋 정의 생성"""
+        all_metadata = self.get_all_feature_metadata()
+
+        return FeatureSet(
+            name=self.name,
+            version=self.version,
+            features=all_metadata,
+            target_column=target_column,
+            description=f"Feature set generated by pipeline {self.name}",
+        )
+
+
+class FeatureStore:
+    """피처 스토어 - 피처 메타데이터 및 이력 관리"""
+
+    def __init__(self):
+        self.feature_sets: Dict[str, FeatureSet] = {}
+        self.feature_metadata: Dict[str, FeatureMetadata] = {}
+
+    def register_feature_set(self, feature_set: FeatureSet) -> None:
+        """피처 셋 등록"""
+        key = f"{feature_set.name}:{feature_set.version}"
+        self.feature_sets[key] = feature_set
+
+        # 개별 피처 메타데이터도 등록
+        for feature in feature_set.features:
+            self.feature_metadata[feature.name] = feature
+
+        logger.info(f"Registered feature set: {key} with {len(feature_set.features)} features")
+
+    def get_feature_set(self, name: str, version: Optional[str] = None) -> Optional[FeatureSet]:
+        """피처 셋 조회"""
+        if version:
+            key = f"{name}:{version}"
+            return self.feature_sets.get(key)
+
+        # 버전이 없으면 최신 버전 반환
+        matching_sets = [
+            fs for key, fs in self.feature_sets.items()
+            if key.startswith(f"{name}:")
+        ]
+
+        if matching_sets:
+            return max(matching_sets, key=lambda fs: fs.created_at)
+
+        return None
+
+    def get_feature_metadata(self, feature_name: str) -> Optional[FeatureMetadata]:
+        """피처 메타데이터 조회"""
+        return self.feature_metadata.get(feature_name)
+
+    def list_feature_sets(self) -> List[FeatureSet]:
+        """모든 피처 셋 목록"""
+        return list(self.feature_sets.values())
+
+    def search_features(
+        self,
+        feature_type: Optional[str] = None,
+        source_column: Optional[str] = None,
+        min_importance: Optional[float] = None
+    ) -> List[FeatureMetadata]:
+        """피처 검색"""
+        results = []
+
+        for feature in self.feature_metadata.values():
+            # 타입 필터
+            if feature_type and feature.feature_type != feature_type:
+                continue
+
+            # 소스 컬럼 필터
+            if source_column and source_column not in feature.source_columns:
+                continue
+
+            # 중요도 필터
+            if min_importance and (feature.importance_score is None or feature.importance_score < min_importance):
+                continue
+
+            results.append(feature)
+
+        return results
+
+    def export_metadata(self) -> Dict[str, Any]:
+        """메타데이터를 딕셔너리로 내보내기"""
+        return {
+            "feature_sets": {
+                key: {
+                    "name": fs.name,
+                    "version": fs.version,
+                    "description": fs.description,
+                    "target_column": fs.target_column,
+                    "created_at": fs.created_at.isoformat() if fs.created_at else None,
+                    "feature_count": len(fs.features),
+                    "features": [
+                        {
+                            "name": f.name,
+                            "description": f.description,
+                            "feature_type": f.feature_type,
+                            "source_columns": f.source_columns,
+                            "data_type": f.data_type,
+                            "expected_range": f.expected_range,
+                            "nullable": f.nullable,
+                            "importance_score": f.importance_score,
+                        }
+                        for f in fs.features
+                    ]
+                }
+                for key, fs in self.feature_sets.items()
+            }
+        }
+
+
+# 전역 피처 스토어 인스턴스
+global_feature_store = FeatureStore()

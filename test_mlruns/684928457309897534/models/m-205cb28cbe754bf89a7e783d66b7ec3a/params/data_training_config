@@ -1,0 +1,1 @@
+{'min_training_samples': 10, 'test_size': 0.3, 'validation_split': 0.2, 'use_time_series_split': True, 'n_splits': 3, 'feature_selection_threshold': 0.01, 'max_features': 20, 'random_state': 42, 'cross_validation': True, 'enable_feature_selection': True, 'enable_hyperparameter_tuning': True, 'early_stopping': True}

@@ -1,0 +1,22 @@
+artifact_path: file:///Users/seoyeonmun/commute-weather-self-mlops/test_mlruns/684928457309897534/models/m-db8678205d764a19b28d3b804e791664/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.13.7
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.7.2
+mlflow_version: 3.4.0
+model_id: m-db8678205d764a19b28d3b804e791664
+model_size_bytes: 222187
+model_uuid: m-db8678205d764a19b28d3b804e791664
+prompts: null
+run_id: 87f589a147b7460383cd534c9857b22c
+utc_time_created: '2025-09-28 14:29:39.497991'
