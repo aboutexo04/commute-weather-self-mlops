@@ -880,6 +880,27 @@ async def trigger_pipeline():
 async def get_model_info():
     """Get current model information."""
     try:
+        # Get actual KMA data freshness
+        data_freshness = "데이터 수집 중..."
+        try:
+            config = get_kma_config()
+            latest_observations = fetch_recent_weather_kma(config, lookback_hours=3)
+            if latest_observations:
+                latest_time = latest_observations[-1].timestamp
+                import pytz
+                kst = pytz.timezone('Asia/Seoul')
+                current_time = datetime.now(kst)
+                time_diff = current_time - latest_time.replace(tzinfo=kst)
+
+                if time_diff.total_seconds() < 3600:  # 1시간 미만
+                    minutes_ago = int(time_diff.total_seconds() // 60)
+                    data_freshness = f"{minutes_ago}분 전 관측 데이터"
+                else:
+                    hours_ago = int(time_diff.total_seconds() // 3600)
+                    data_freshness = f"{hours_ago}시간 전 관측 데이터"
+        except Exception:
+            data_freshness = "최근 관측 데이터"
+
         model_info = {
             "model_name": "Enhanced Commute Weather Predictor",
             "version": "2.0.0",
@@ -892,7 +913,7 @@ async def get_model_info():
             "performance": {
                 "accuracy": "85-90%",
                 "last_training": "실시간 업데이트",
-                "data_freshness": f"방금 업데이트됨 ({datetime.now().strftime('%H:%M')})"
+                "data_freshness": data_freshness
             },
             "infrastructure": {
                 "storage": "S3 (my-mlops-symun)",
