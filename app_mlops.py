@@ -515,7 +515,7 @@ async def predict_enhanced(prediction_type: str) -> Dict[str, Any]:
             except Exception as e:
                 raise HTTPException(status_code=502, detail=f"데이터 수집 실패: {str(e)}")
         elif prediction_type in ["morning", "evening"]:
-            # Time-based predictions with enhanced ML
+            # Cache-first batch predictions with fallback
             kst = pytz.timezone('Asia/Seoul')
             current_hour = datetime.now(kst).hour
 
@@ -537,6 +537,32 @@ async def predict_enhanced(prediction_type: str) -> Dict[str, Any]:
                         "current_time": datetime.now(kst).strftime("%Y-%m-%d %H:%M"),
                         "recommendation": "오후 시간대에 다시 확인해주세요! 🤖"
                     }
+
+            # Try Redis cache first
+            try:
+                import redis
+                import json
+
+                redis_client = redis.Redis(
+                    host=os.getenv('REDIS_HOST', 'mlops-redis-prod'),
+                    port=6379,
+                    password=os.getenv('REDIS_PASSWORD'),
+                    decode_responses=True
+                )
+
+                cache_key = f"prediction:{prediction_type}:{current_hour}"
+                cached_result = redis_client.get(cache_key)
+
+                if cached_result:
+                    logger.info(f"✅ Cache hit for {cache_key}")
+                    result = json.loads(cached_result)
+                    result["source"] = "batch_cache"
+                    return result
+                else:
+                    logger.info(f"⚠️ Cache miss for {cache_key}, falling back to real-time prediction")
+
+            except Exception as e:
+                logger.warning(f"Redis cache failed: {e}, falling back to real-time prediction")
 
             # Get recent observations for prediction
             try:
@@ -603,7 +629,8 @@ async def predict_enhanced(prediction_type: str) -> Dict[str, Any]:
                     "label": label,
                     "prediction_time": datetime.now(kst).strftime("%Y-%m-%d %H:%M"),
                     "evaluation": evaluation,
-                    "ml_info": ml_info
+                    "ml_info": ml_info,
+                    "source": "realtime_fallback"
                 }
 
             except Exception as e:
@@ -634,6 +661,67 @@ async def get_ml_info() -> Dict[str, Any]:
         return ml_info
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/batch-prediction-status")
+async def get_batch_prediction_status() -> Dict[str, Any]:
+    """배치 예측 캐시 상태 확인"""
+    try:
+        import redis
+        import json
+        from datetime import datetime
+        import pytz
+
+        kst = pytz.timezone('Asia/Seoul')
+        current_time = datetime.now(kst)
+        current_hour = current_time.hour
+
+        # Redis 연결
+        redis_client = redis.Redis(
+            host=os.getenv('REDIS_HOST', 'mlops-redis-prod'),
+            port=6379,
+            password=os.getenv('REDIS_PASSWORD'),
+            decode_responses=True
+        )
+
+        status = {
+            "timestamp": current_time.isoformat(),
+            "current_hour": current_hour,
+            "cache_status": {},
+            "next_batch_times": []
+        }
+
+        # 현재 캐시 상태 확인
+        for pred_type in ["morning", "evening"]:
+            cache_key = f"prediction:{pred_type}:{current_hour}"
+            cached_result = redis_client.get(cache_key)
+
+            if cached_result:
+                result = json.loads(cached_result)
+                status["cache_status"][pred_type] = {
+                    "available": True,
+                    "score": result.get("score"),
+                    "label": result.get("label"),
+                    "generated_time": result["ml_info"].get("cache_generated"),
+                    "ttl": redis_client.ttl(cache_key)
+                }
+            else:
+                status["cache_status"][pred_type] = {
+                    "available": False,
+                    "reason": "not_generated_yet" if pred_type == "morning" and current_hour < 6 or pred_type == "evening" and current_hour < 14 else "expired"
+                }
+
+        # 다음 배치 실행 시간 계산
+        if current_hour < 6:
+            status["next_batch_times"] = ["06:00 (morning)", "07:00 (morning)", "08:00 (morning)"]
+        elif current_hour < 14:
+            status["next_batch_times"] = ["14:00 (evening)", "15:00 (evening)", "16:00 (evening)"]
+        else:
+            status["next_batch_times"] = ["Tomorrow 06:00 (morning)"]
+
+        return status
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"배치 예측 상태 확인 실패: {str(e)}")
 
 @app.get("/data-quality")
 async def get_data_quality() -> Dict[str, Any]:
