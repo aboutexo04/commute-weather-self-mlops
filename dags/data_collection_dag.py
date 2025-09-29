@@ -72,7 +72,7 @@ def collect_weather_data(**context):
         # S3 저장
         s3_manager = S3StorageManager(bucket_name=os.getenv('COMMUTE_S3_BUCKET', 'my-mlops-symun'))
 
-        # 각 관측 데이터를 S3에 저장
+        # 각 관측 데이터를 S3에 저장 (Raw data)
         saved_count = 0
         for obs in observations:
             try:
@@ -94,15 +94,53 @@ def collect_weather_data(**context):
                     }
                 )
                 saved_count += 1
-                print(f"✅ Saved observation: {obs.timestamp}")
+                print(f"✅ Saved raw observation: {obs.timestamp}")
             except Exception as e:
                 print(f"⚠️ Failed to save observation {obs.timestamp}: {e}")
 
-        print(f"📈 Successfully saved {saved_count}/{len(observations)} observations")
+        print(f"📈 Successfully saved {saved_count}/{len(observations)} raw observations")
+
+        # 피처 엔지니어링 및 ML 데이터셋 저장
+        try:
+            from commute_weather.features.feature_engineering import WeatherFeatureEngineer
+            import pandas as pd
+
+            print("🧮 Starting feature engineering...")
+            feature_engineer = WeatherFeatureEngineer()
+
+            ml_datasets_saved = 0
+            for obs in observations:
+                try:
+                    # 단일 관측값을 리스트로 래핑하여 피처 엔지니어링
+                    features = feature_engineer.engineer_features([obs], obs.timestamp)
+
+                    # DataFrame으로 변환
+                    features_df = pd.DataFrame([features])
+
+                    # ML 데이터셋으로 S3에 저장
+                    s3_manager.store_processed_features(
+                        df=features_df,
+                        feature_set_name="kma_weather_features",
+                        version="v1",
+                        timestamp=obs.timestamp
+                    )
+
+                    ml_datasets_saved += 1
+                    print(f"✅ Saved ML dataset: {obs.timestamp}")
+
+                except Exception as e:
+                    print(f"⚠️ Failed to create ML dataset for {obs.timestamp}: {e}")
+
+            print(f"🧮 Successfully saved {ml_datasets_saved}/{len(observations)} ML datasets")
+
+        except Exception as e:
+            print(f"⚠️ Feature engineering failed: {e}")
+            # 피처 엔지니어링 실패해도 raw data는 저장되었으므로 전체 실패로 처리하지 않음
 
         return {
             'observations_count': len(observations),
-            'saved_count': saved_count,
+            'raw_data_saved': saved_count,
+            'ml_datasets_saved': ml_datasets_saved if 'ml_datasets_saved' in locals() else 0,
             'status': 'success',
             'timestamp': datetime.now().isoformat()
         }
@@ -130,23 +168,28 @@ def validate_data_quality(**context):
             print("⚠️ No collection result found")
             return {'overall': 0.0, 'status': 'no_data'}
 
-        saved_count = collection_result.get('saved_count', 0)
+        raw_data_saved = collection_result.get('raw_data_saved', 0)
+        ml_datasets_saved = collection_result.get('ml_datasets_saved', 0)
         total_count = collection_result.get('observations_count', 0)
 
         # 간단한 품질 평가
         if total_count == 0:
-            completeness = 0.0
+            raw_completeness = 0.0
+            ml_completeness = 0.0
         else:
-            completeness = saved_count / total_count
+            raw_completeness = raw_data_saved / total_count
+            ml_completeness = ml_datasets_saved / total_count
 
         # 기본적인 품질 메트릭
         quality_result = {
-            'completeness': completeness,
+            'raw_data_completeness': raw_completeness,
+            'ml_data_completeness': ml_completeness,
             'consistency': 0.98,  # 가정값
             'timeliness': 0.92,   # 가정값
             'total_observations': total_count,
-            'saved_observations': saved_count,
-            'overall': completeness * 0.6 + 0.95 * 0.4  # weighted average
+            'raw_data_saved': raw_data_saved,
+            'ml_datasets_saved': ml_datasets_saved,
+            'overall': (raw_completeness * 0.4 + ml_completeness * 0.4 + 0.95 * 0.2)  # weighted average
         }
 
         print(f"📊 Quality Results: {quality_result}")

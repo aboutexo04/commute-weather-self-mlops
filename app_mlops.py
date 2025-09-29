@@ -509,6 +509,8 @@ async def predict_enhanced(prediction_type: str) -> Dict[str, Any]:
                     "ml_info": ml_info
                 }
 
+                return response_data
+
             except Exception as e:
                 raise HTTPException(status_code=502, detail=f"데이터 수집 실패: {str(e)}")
         elif prediction_type in ["morning", "evening"]:

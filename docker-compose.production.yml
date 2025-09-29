@@ -28,6 +28,12 @@ services:
     environment:
       - PYTHONPATH=/app/src
       - ENVIRONMENT=production
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=ap-northeast-2
+      - KMA_AUTH_KEY=${KMA_AUTH_KEY}
+      - COMMUTE_S3_BUCKET=${COMMUTE_S3_BUCKET}
+      - WANDB_API_KEY=${WANDB_API_KEY}
     volumes:
       - ./.env:/app/.env:ro  # Production 환경 변수
       - ./logs:/app/logs     # 로그 디렉토리
