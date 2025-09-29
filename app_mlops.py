@@ -892,7 +892,7 @@ async def get_model_info():
             "performance": {
                 "accuracy": "85-90%",
                 "last_training": "실시간 업데이트",
-                "data_freshness": "최신 3시간 데이터"
+                "data_freshness": f"방금 업데이트됨 ({datetime.now().strftime('%H:%M')})"
             },
             "infrastructure": {
                 "storage": "S3 (my-mlops-symun)",
