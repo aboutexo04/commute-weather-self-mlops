@@ -34,3 +34,8 @@ redis>=5.0
 # Additional utilities for production
 sentry-sdk[fastapi]>=1.38
 prometheus-client>=0.19
+
+# Workflow orchestration
+apache-airflow>=2.8.0
+apache-airflow-providers-postgres>=5.7.0
+apache-airflow-providers-amazon>=8.11.0
