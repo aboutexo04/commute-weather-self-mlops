@@ -477,9 +477,14 @@ async def predict_enhanced(prediction_type: str) -> Dict[str, Any]:
                         logger.warning(f"Enhanced prediction failed, using basic: {e}")
 
                 # Basic response for current weather
+                from datetime import datetime
+                import pytz
+                kst = pytz.timezone('Asia/Seoul')
+                current_time = datetime.now(kst).strftime("%Y-%m-%d %H:%M")
+
                 response_data = {
                     "title": title,
-                    "prediction_time": latest.timestamp.strftime("%Y-%m-%d %H:%M"),
+                    "prediction_time": current_time,
                     "current_temp": current_temp,
                     "current_humidity": current_humidity,
                     "current_precipitation": current_precipitation,
