@@ -300,7 +300,9 @@ async def home():
                 resultDiv.innerHTML = '<div class="loading">⚡ MLOps 파이프라인 실행 중...</div>';
 
                 try {
-                    const response = await fetch('/mlops/pipeline/trigger');
+                    const response = await fetch('/mlops/pipeline', {
+                        method: 'POST'
+                    });
                     const data = await response.json();
 
                     if (response.ok) {
@@ -318,7 +320,7 @@ async def home():
                 resultDiv.innerHTML = '<div class="loading">🤖 모델 정보 조회 중...</div>';
 
                 try {
-                    const response = await fetch('/mlops/models/current');
+                    const response = await fetch('/mlops/model-info');
                     const data = await response.json();
 
                     if (response.ok) {
@@ -394,17 +396,19 @@ async def home():
             }
 
             function displayPipelineResult(data) {
-                const result = data.result;
                 document.getElementById('result').innerHTML = `
-                    <h3>⚡ MLOps 파이프라인 결과</h3>
-                    <p><strong>상태:</strong> ${result.status === 'success' ? '✅ 성공' : '❌ 실패'}</p>
-                    ${result.status === 'success' ? `
-                        <p>🎯 예측값: ${result.prediction_value?.toFixed(2) || 'N/A'}</p>
-                        <p>📊 신뢰도: ${(result.prediction_confidence * 100)?.toFixed(1) || 'N/A'}%</p>
-                        <p>⏱️ 실행시간: ${result.execution_time_seconds?.toFixed(2) || 'N/A'}초</p>
-                        <p>📅 데이터 시간: ${result.data_timestamp || 'N/A'}</p>
+                    <h3>⚡ MLOps 파이프라인 실행</h3>
+                    <p><strong>상태:</strong> ${data.status === 'started' ? '✅ 시작됨' : '❌ 실패'}</p>
+                    ${data.status === 'started' ? `
+                        <p>🔧 파이프라인 ID: ${data.pipeline_id}</p>
+                        <p>💬 메시지: ${data.message}</p>
+                        <p>⏱️ 예상 소요시간: ${data.estimated_duration}</p>
+                        <p>🔄 실행 단계:</p>
+                        <ul>
+                            ${data.components_triggered?.map(comp => `<li>• ${comp}</li>`).join('') || '<li>• 정보 없음</li>'}
+                        </ul>
                     ` : `
-                        <p>❌ 오류: ${result.error || '알 수 없는 오류'}</p>
+                        <p>❌ 오류: ${data.message || '알 수 없는 오류'}</p>
                     `}
                 `;
             }
@@ -413,21 +417,34 @@ async def home():
                 if (data.message) {
                     document.getElementById('result').innerHTML = `
                         <h3>🤖 모델 정보</h3>
-                        <p>${data.message}</p>
+                        <p>❌ ${data.message}</p>
                     `;
                     return;
                 }
 
-                const performance = data.performance_metrics || {};
+                const features = data.features || {};
+                const performance = data.performance || {};
+                const infrastructure = data.infrastructure || {};
+
                 document.getElementById('result').innerHTML = `
-                    <h3>🤖 현재 프로덕션 모델</h3>
-                    <p><strong>모델명:</strong> ${data.model_name}</p>
-                    <p><strong>버전:</strong> ${data.model_version}</p>
-                    <p><strong>단계:</strong> ${data.stage}</p>
-                    <p><strong>생성시간:</strong> ${new Date(data.creation_time).toLocaleString('ko-KR')}</p>
-                    <p><strong>R² 점수:</strong> ${performance.r2?.toFixed(3) || 'N/A'}</p>
-                    <p><strong>MAE:</strong> ${performance.mae?.toFixed(3) || 'N/A'}</p>
-                    <p><strong>상태:</strong> ${data.status === 'active' ? '✅ 활성' : '❌ 비활성'}</p>
+                    <h3>🤖 ${data.model_name}</h3>
+                    <p><strong>버전:</strong> ${data.version}</p>
+                    <p><strong>프레임워크:</strong> ${data.framework}</p>
+
+                    <h4>📊 특성 정보</h4>
+                    <p>• 총 특성 수: ${features.total_features}</p>
+                    <p>• 특성 엔지니어링: ${features.feature_engineering}</p>
+                    <p>• 데이터 소스: ${features.data_sources?.join(', ') || 'N/A'}</p>
+
+                    <h4>⚡ 성능 지표</h4>
+                    <p>• 정확도: ${performance.accuracy}</p>
+                    <p>• 마지막 훈련: ${performance.last_training}</p>
+                    <p>• 데이터 신선도: ${performance.data_freshness}</p>
+
+                    <h4>🏗️ 인프라</h4>
+                    <p>• 저장소: ${infrastructure.storage}</p>
+                    <p>• 추적: ${infrastructure.tracking}</p>
+                    <p>• 배포: ${infrastructure.deployment}</p>
                 `;
             }
         </script>
