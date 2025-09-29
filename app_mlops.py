@@ -353,7 +353,7 @@ async def home():
 
                 const scoreIcon = data.score >= 60 ? '🌟' : '⚠️';
 
-                if (data.title.includes('현재 시점')) {
+                if (data.title.includes('지금 날씨') || data.current_temp !== undefined) {
                     const precipitationValue = Number(data.current_precipitation ?? 0);
                     let precipitationInfo = '<p>☀️ 강수: 없음</p>';
                     if (precipitationValue > 0) {
