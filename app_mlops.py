@@ -386,9 +386,9 @@ async def home():
                 document.getElementById('result').innerHTML = `
                     <h3>🔧 MLOps 시스템 상태</h3>
                     <p><strong>전체 상태:</strong> ${statusIcon} ${overallStatus}</p>
-                    <p>📈 MLflow: ${data.mlflow_connected ? '✅' : '❌'} 연결됨</p>
-                    <p>📊 WandB: ${data.wandb_connected ? '✅' : '❌'} 연결됨</p>
-                    <p>☁️ S3: ${data.s3_connected ? '✅' : '❌'} 연결됨</p>
+                    <p>📈 MLflow: ${data.mlflow_connected ? '✅ 연결됨' : '❌ 연결되지 않음'}</p>
+                    <p>📊 WandB: ${data.wandb_connected ? '✅ 연결됨' : '❌ 연결되지 않음'}</p>
+                    <p>☁️ S3: ${data.s3_connected ? '✅ 연결됨' : '❌ 연결되지 않음'}</p>
                     <p>⏰ 확인 시간: ${new Date(data.timestamp).toLocaleString('ko-KR')}</p>
                 `;
             }
@@ -814,11 +814,20 @@ async def health_check():
 @app.get("/mlops/health")
 async def mlops_health_check():
     """MLOps specific health check endpoint."""
+    # Check WandB connection (optional)
+    wandb_connected = False
+    try:
+        import os
+        wandb_connected = bool(os.environ.get('WANDB_API_KEY'))
+    except:
+        wandb_connected = False
+
     health_status = {
         "overall_status": "healthy" if all([predictor, s3_manager, mlflow_manager, feature_engineer]) else "partial",
         "timestamp": datetime.now().isoformat(),
         "mlflow_connected": mlflow_manager is not None,
         "s3_connected": s3_manager is not None,
+        "wandb_connected": wandb_connected,
         "predictor_ready": predictor is not None,
         "feature_engineer_ready": feature_engineer is not None,
         "components": {
