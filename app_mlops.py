@@ -459,6 +459,9 @@ async def home():
 async def predict_enhanced(prediction_type: str) -> Dict[str, Any]:
     """Get enhanced weather prediction with ML info."""
     try:
+        from datetime import datetime
+        import pytz
+
         config = get_kma_config()
 
         if prediction_type == "now":
@@ -494,8 +497,6 @@ async def predict_enhanced(prediction_type: str) -> Dict[str, Any]:
                         logger.warning(f"Enhanced prediction failed, using basic: {e}")
 
                 # Basic response for current weather
-                from datetime import datetime
-                import pytz
                 kst = pytz.timezone('Asia/Seoul')
                 current_time = datetime.now(kst).strftime("%Y-%m-%d %H:%M")
 
